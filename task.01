@@ -1,0 +1,199 @@
+#include <opencv2/opencv.hpp>
+#include <iostream>
+#include <string>
+
+
+#ifndef SRC_DIR
+#define SRC_DIR "."
+#endif
+
+
+int main() {
+    std::cout << "OpenCV 版本: " << CV_VERSION << std::endl;
+    return 0;
+}
+
+#include <opencv2/opencv.hpp>
+#include <iostream>
+#include <string>
+
+
+#ifndef SRC_DIR
+#define SRC_DIR "."
+#endif
+
+
+int main() {
+    std::cout << "OpenCV 版本: " << CV_VERSION << std::endl;
+
+    cv::Mat img(300, 400, CV_8UC3, cv::Scalar(40, 40, 40));
+    cv::circle(img, cv::Point(200, 150), 80, cv::Scalar(0, 200, 255), 4);
+    cv::putText(img, "OpenCV", cv::Point(150, 160),
+                cv::FONT_HERSHEY_SIMPLEX, 1.2, cv::Scalar(255, 255, 255), 2);
+
+
+    cv::imshow("My Window",img);
+    cv::imwrite("output.bmp",img);
+    cv::waitKey(0) ;           
+    std::cout << "图像尺寸: " << img.cols << " x " << img.rows << std::endl;
+    std::cout << "已成功链接 OpenCV" << std::endl;
+    return 0;
+}
+
+#include <opencv2/opencv.hpp>
+#include <iostream>
+#include <string>
+
+
+#ifndef SRC_DIR
+#define SRC_DIR "."
+#endif
+
+int main() {
+
+std::cout << "=== OpenCV " << CV_VERSION << " ===" << std::endl;
+
+    cv::Mat img = cv::imread("train.jpg");
+    if (img.empty()) { std::cout << "读不到图片\n"; return 1; }
+    std::cout << "原图: " << img.cols << " x " << img.rows << std::endl;
+    std::string out = std::string(SRC_DIR) + "/results/";
+
+cv::Mat hsv, m1, m2, maskRed, redOnly;
+    cv::cvtColor(img, hsv, cv::COLOR_BGR2HSV);
+    cv::inRange(hsv, cv::Scalar(0,   80, 60), cv::Scalar(12,  255, 255), m1);
+    cv::inRange(hsv, cv::Scalar(168, 80, 60), cv::Scalar(180, 255, 255), m2);
+    cv::bitwise_or(m1, m2, maskRed);
+    cv::bitwise_and(img, img, redOnly, maskRed);
+    cv::imwrite(out + "03_red_only.bmp", redOnly);
+    std::cout << "[3] 红色像素: " << cv::countNonZero(maskRed) << std::endl;
+
+// 弹窗显示原图和提取出的红色部分
+cv::imshow("Original (原图)", img);
+cv::imshow("Red Only (仅红色)", redOnly);
+cv::waitKey(0); // 按任意键关闭
+
+
+std::cout << "全部完成，结果在 results/" << std::endl;
+    return 0;
+}
+
+#include <opencv2/opencv.hpp>
+#include <iostream>
+#include <string>
+
+
+#ifndef SRC_DIR
+#define SRC_DIR "."
+#endif
+
+int main() {
+    std::cout << "=== OpenCV " << CV_VERSION << " ===" << std::endl;
+
+    cv::Mat img = cv::imread("train.jpg");
+    if (img.empty()) { std::cout << "读不到图片\n"; return 1; }
+    std::cout << "原图: " << img.cols << " x " << img.rows << std::endl;
+    std::string out = std::string(SRC_DIR) + "/results/";
+
+    cv::Mat gray, blur, edges;
+    cv::cvtColor(img, gray, cv::COLOR_BGR2GRAY);
+    cv::GaussianBlur(gray, blur, cv::Size(11, 11), 0);
+    cv::Canny(blur, edges, 60, 160);
+    
+    cv::imwrite(out + "05_canny.png", edges);
+    std::cout << "[5] 边缘像素: " << cv::countNonZero(edges) << std::endl;
+
+    
+    cv::namedWindow("Original (原图)", cv::WINDOW_NORMAL); 
+    cv::namedWindow("Canny Edges (边缘检测)", cv::WINDOW_NORMAL); 
+
+    cv::imshow("Original (原图)", img);           
+    cv::imshow("Canny Edges (边缘检测)", edges);  
+
+    cv::resizeWindow("Original (原图)", 800, 600); 
+    cv::resizeWindow("Canny Edges (边缘检测)", 800, 600); 
+    
+    cv::waitKey(0); 
+    cv::destroyAllWindows(); 
+
+    std::cout << "全部完成，结果在 results/" << std::endl;
+    return 0;
+}
+
+#include <opencv2/opencv.hpp>
+#include <iostream>
+#include <string>
+
+
+#ifndef SRC_DIR
+#define SRC_DIR "."
+#endif
+
+int main() {
+    std::cout << "=== OpenCV " << CV_VERSION << " ===" << std::endl;
+
+    cv::Mat img = cv::imread("train.jpg");
+    if (img.empty()) { std::cout << "读不到图片\n"; return 1; }
+    std::cout << "原图: " << img.cols << " x " << img.rows << std::endl;
+    std::string out = std::string(SRC_DIR) + "/results/";
+
+    cv::Rect box(580, 255, 580, 921);
+    cv::Mat roi = img(box);
+    cv::imwrite(out + "01_roi.bmp", roi);
+    std::cout << "[1] ROI: " << roi.cols << " x " << roi.rows << std::endl;
+
+
+ cv::imshow("Original Image", img);   
+    cv::imshow("Cropped ROI", roi);      
+    cv::waitKey(0);                 
+
+std::cout << "全部完成，结果在 results/" << std::endl;
+    return 0;
+}
+
+#include <opencv2/opencv.hpp>
+#include <iostream>
+#include <string>
+
+
+#ifndef SRC_DIR
+#define SRC_DIR "."
+#endif
+int main() {
+    std::cout << "=== OpenCV " << CV_VERSION << " ===" << std::endl;
+
+    cv::Mat img = cv::imread("train.jpg");
+    if (img.empty()) { std::cout << "读不到图片\n"; return 1; }
+    std::cout << "原图: " << img.cols << " x " << img.rows << std::endl;
+    std::string out = std::string(SRC_DIR) + "/results/";
+
+    cv::Mat gray, blur, binRaw, binBlur;
+    cv::cvtColor(img, gray, cv::COLOR_BGR2GRAY);
+    cv::GaussianBlur(gray, blur, cv::Size(11, 11), 0);
+    double t1 = cv::threshold(gray, binRaw,  0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
+    double t2 = cv::threshold(blur, binBlur, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
+    cv::imwrite(out + "04_binary_raw.bmp",  binRaw);
+    cv::imwrite(out + "04_binary_blur.bmp", binBlur);
+    std::cout << "[4] Otsu: " << t1 << " -> " << t2 << std::endl;
+        cv::imshow("Step 4: Binary Raw (未模糊二值化)", binRaw);
+    cv::imshow("Step 4: Binary Blur (模糊后二值化)", binBlur);
+    cv::waitKey(0); 
+
+std::cout << "全部完成，结果在 results/" << std::endl;
+    return 0;
+}
+
+cmake:
+cmake_minimum_required(VERSION 3.10)
+project(vision_demo)
+
+find_package(OpenCV REQUIRED)
+
+add_executable(vision_demo main.cpp)
+target_link_libraries(vision_demo PRIVATE ${OpenCV_LIBS})
+
+# 工程目录编进程序，读图/存图不受运行目录影响
+target_compile_definitions(vision_demo PRIVATE SRC_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+
+# 保证 results/ 存在（否则 imwrite 会静默失败）
+file(MAKE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/results)
+
