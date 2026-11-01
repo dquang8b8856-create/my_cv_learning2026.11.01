@@ -3,7 +3,7 @@
  *  最小视觉小任务 —— 导航方向
  *  功能：二值化分离可通行区域与障碍，统计连通域并按面积排序
  *  环境：Ubuntu 24.04 + OpenCV 4.11 + CMake 3.28 + g++ 13.3
- *  运行：cmake -S . -B build && cmake --build build && ./build/vision_demo
+ *  运行：cmake -S . -B build && cmake --build build && ./build/task0_nav
  * ============================================================
  */
 #include <opencv2/opencv.hpp>
