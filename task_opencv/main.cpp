@@ -36,8 +36,12 @@ int main() {
     cv::Mat roi   = demo::step1_roi(img, out);
     cv::Mat small = demo::step2_resize(img, out);
     cv::Mat red   = demo::step3_hsv(img, out);
-    cv::Mat bin   = demo::step4_blurbinary(img, out);
-    cv::Mat edges = demo::step5_canny(img, out);
+
+    // step4 把模糊后的灰度图交出来，step5 直接拿去做 Canny，
+    // 不重复做一次灰度化 + 高斯模糊
+    cv::Mat blurGray;
+    cv::Mat bin   = demo::step4_blurbinary(img, out, blurGray);
+    cv::Mat edges = demo::step5_canny(blurGray, out);
 
     cv::imwrite(out + "00_original.jpg", img);
 
