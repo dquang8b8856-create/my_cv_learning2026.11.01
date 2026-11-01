@@ -11,14 +11,11 @@ find_package(OpenCV REQUIRED)
 
 add_executable(vision_demo
   main.cpp
-  src/demo_version.cpp
-  src/demo_basic.cpp
-  src/demo_roi.cpp
-  src/demo_resize.cpp
-  src/demo_hsv.cpp
-  src/demo_blurbinary.cpp
-  src/demo_canny.cpp
-  src/demo_components.cpp
+  src/step1_roi.cpp
+  src/step2_resize.cpp
+  src/step3_hsv.cpp
+  src/step4_blurbinary.cpp
+  src/step5_canny.cpp
 )
 
 target_include_directories(vision_demo PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include ${OpenCV_INCLUDE_DIRS})
