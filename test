@@ -1,0 +1,303 @@
+main.cpp
+#include < opencv2/opencv.hpp>
+#include < iostream>
+#include < 绳>
+#include“m.hpp”
+#include < cstdio>
+#include < 矢量>
+
+#ifndef SRC_DIR
+#define SRC_DIR“。”
+#endif
+
+int main（int argc，char** argv） {
+Mat src = imread（“../test1.jpg“）;
+字符串路径 = 字符串（SRC_DIR） + “/test1.jpg”;
+Mat src = imread（路径）;
+if（src.empty（））{
+printf（“无法加载图像......\n”）;
+Cout << “读不到图片：”<< Path << endl;
+返回-1;
+    }
+Cout << “读图成功：”<< src.cols << “x ” << src.rows << endl;
+
+namedWindow（“输入窗口”，WINDOW_FREERATIO）;
+imshow（“输入窗口”，src）;
+
+namedWindow（“输入窗口”，WINDOW_NORMAL）;
+imshow（“输入窗口”，src）;
+
+MyDemo演示;
+demo.inrangedemo（src）;
+Mat bin = imread（“01_mask.png”，IMREAD_GRAYSCALE）;
+如果 （bin.empty（）） {
+Cout <<“读不到 01_mask.png” << endl;
+返回-1;
+}
+vector<LightBar> bars = demo.findLightBars（bin）;
+vector<ArmorPair> pairs = demo.pairLightBars（bars）;
+
+Mat vis = src.clone（）;
+demo.drawCandidates（可见，条纹）;
+demo.drawPairs（vis， pairs）;
+imwrite（“03_candidates.png”，vis）;
+
+对于 （size_t k = 0; k < pairs.size（）; k++） {
+Rect box = pairs[k].box;
+box.x = max（0， box.x）;
+box.y = max（0， box.y）;
+box.width = min（box.width， src.cols - box.x）;
+box.height = min（box.height， src.rows - box.y）;
+
+Mat roi = src（box）.clone（）;
+如果 （roi.empty（）） 继续;
+
+马特·罗伊比格;
+resize（roi， roiBig， Size（）， 3.0， 3.0， INTER_NEAREST）;
+
+字符串名 = “04_roi_” + to_string（k） + “.png”;
+imwrite（名字，roiBig）;
+<< “ROI 保存：”<<名称
+<< “（” << roi.cols << “x” << roi.rows <<“）” << endl;
+imshow（“装甲板 ROI”，roiBig）;
+    }
+
+垫子最终 = src.clone（）;
+demo.drawPairs（决赛，配对）;
+imwrite（“05_result.png”，结尾）;
+
+
+imshow（“原图”，src）;
+imshow（“二值图”，bin）;
+imshow（“灯条候选”，vis）;
+imshow（“最终结果”，final）;
+waitKey（0）;
+
+destroyAllWindows（）;
+cout << “\n全部完成，结果在 build/ 目录：” << endl;
+cout << “01_mask.png 二值图” << endl;
+cout << “03_candidates.png 灯条候选” << endl;
+cout << “04_roi_0.png 装甲板 ROI” << endl;
+Cout << “05_result.png最终结果” << endl;
+返回0;
+
+}
+
+hpp：声明
+
+#pragma 一次
+#include< iostream>
+
+#include< opencv2/opencv.hpp>
+
+使用命名空间 CV;
+使用命名空间标准;
+struct LightBar {
+RotatedRect rect;
+中锋;
+流通比率;
+};
+
+结构护甲对 {
+LightBar左边;
+LightBar右侧;
+Rect 盒子;
+
+};
+
+类 MyDemo{
+公众：
+      
+空白 inrangedemo（Mat & image）;
+空白 inrangedemo（Mat & image）;
+std：：vector<LightBar > findLightBars（Mat & bin）;
+void drawCandidates（Mat & canvas， std：：vector<LightBar> & bars）;
+vector<ArmorPair>pairLightBars（vector<LightBar> & bars）;// ← 新增声明
+虚空绘画对（垫子与画布，矢量计<护甲对>对）;
+      
+};
+
+
+
+
+m.cpp
+#include“m.hpp”
+#include< iostream>
+使用命名空间 CV;
+
+void MyDemo：：inrangedemo（Mat & image） {
+Mat hsv，m1，m2，mask，结果;
+
+cvtColor（图像，hsv，COLOR_BGR2HSV）;
+
+inRange（hsv， Scalar（0， 80， 100）， Scalar（25， 255， 255）， m1）;
+inRange（hsv，标量（165， 80， 100），标量（180， 255， 255）， m²）;
+掩膜 = m1 |m2;
+inRange（hsv， Scalar（100， 110， 110）， Scalar（130， 255， 255）， mask）;
+
+// 不要做形态学
+
+bitwise_and（图像、图像、结果、掩码）;
+
+imwrite（“01_mask.png”，面具）;
+imwrite（“02_color.png”，结果）;
+
+cout << “白色像素数： ” << countNonZero（mask） << endl;
+}
+
+vector<LightBar> MyDemo：：findLightBars（Mat & bin） {
+向量<矢量<点>>等高线;
+矢量<光条>条;
+
+findContours（bin， contours， RETR_EXTERNAL， CHAIN_APPROX_SIMPLE）;
+cout << “轮廓总数：” “<< contours.size（） << endl;
+    
+对于（auto &c ： contours） {
+双面积 = 等高线面积（c）;
+如果（面积<400 ||面积> 1200）继续;
+如果（面积<400 ||面积>1500）继续;// ① 面积（关键）
+
+RotatedRect rr = minAreaRect（c）;
+float w = rr.size.width，h = rr.size.height;
+float longSide = max（w， h）;
+float shortSide = min（w， h）;
+如果（短边<2）继续;
+
+浮动比率 = 多边 / 短边;// ② 长宽比
+如果（比值<1.4 ||比值>10）继续;
+
+cout << “✔候选： 面积=” 面积=“ <<面积 << ”宽=“ << w << ”高=“ << h
+<< “长宽比=” << 比率 << endl;
+bars.push_back（{rr， rr.center， ratio}）;
+    }
+
+cout << “灯条候选数”： “<< bars.size（） << endl;
+回车条;
+}
+void MyDemo：:d rawCandidates（Mat & canvas， vector<LightBar> & bars） {
+对于（auto &b ： bars） {
+Point2f点[4];
+b.rect.点（点数）;
+对于（整数i = 0;i < 4;i++）
+线（canvas，pts[i]，pts[（i + 1） % 4]，标量（0， 255， 0）， 2）;
+    }
+}
+
+vector<ArmorPair> MyDemo：:p airLightBars（vector<LightBar> & bars） {
+struct Cand { float score; size_t i， j; };
+vector<Cand> cands;
+
+对于（size_t i = 0;i < bars.size（）; i++） {
+对于 （size_t j = i + 1; j < bars.size（）; j++） {
+size_t a = i， b = j;
+如果 （bars[a].center.x > bars[b].center.x） swap（a， b）;
+
+float wA = bars[a].rect.size.width，hA = bars[a].rect.size.height;
+float wB = bars[b].rect.size.width，hB = bars[b].rect.size.height;
+
+float lenA = max（wA， hA）， lenB = max（wB， hB）;// 灯条长度
+浮点 len = （lenA + lenB） / 2;
+
+浮点数 widA = min（wA， hA），widB = min（wB， hB）;// 灯条宽度
+float wid = max（widA， widB）;
+
+如果 （len < 4 || wid < 2） 继续;
+
+float dx = bars[b].center.x - bars[a].center.x;
+float dy = fabs（bars[a].center.y - bars[b].center.y）;
+
+         
+如果 （fabs（lenA - lenB） / len > 0.35f） 继续;
+
+          
+如果 （fabs（widA - widB） / wid > 0.40f） 继续;
+
+        
+如果 （dy > dx） 继续;
+
+           
+如果 （dx < len * 1.0f || dx > len * 3.5f） 继续;
+
+float score = fabs（dx / len - 2.0f） + fabs（lenA - lenB） / len;
+cands.push_back（{score， a， b}）;
+        }
+    }
+
+sort（cands.begin（）， cands.end（），
+[]（cont Cand &x， cont Cand & y） { 返回 x.score < y.score; }）;
+
+vector<bool> used（bars.size（）， false）;
+vector<ArmorPair>对;
+
+对于（auto &c ： cands） {
+如果（used[c.i] || used[c.j]）继续;
+使用[c.i] = 使用[c.j] = true;
+
+矢量<Point2f>点;
+Point2f，第4页;
+bars[c.i].rect.points（p）;
+对于（整数K = 0;k < 4;k++） pts.push_back（p[k]）;
+bars[c.j].rect.points（p）;
+对于（整数K = 0;k < 4;k++） pts.push_back（p[k]）;
+
+护甲对 AP;
+ap.left = 横线[c.i];
+ap.right = bars[c.j];
+ap.box = boundingRect（pts）;
+pairs.push_back（ap）;
+
+Cout << “✔配对： 分数=” << C.分数
+<< “装甲板=” << ap.box.width << “x” << ap.box.height << endl;
+    }
+
+cout << “配对成功： ” << pairs.size（） << “对” << endl;
+回攻对;
+}
+void MyDemo：:d rawPairs（垫子和画布，矢量体<装甲配对> & pairs） {
+对于（auto &p ： pairs） {
+矩形（画布，p.box，标量（0， 0， 255）， 3）;// 红框
+线（画布，p.left.center，p.right.center，标量（0， 255， 255）， 1）;// 黄线
+    }
+}
+
+void MyDemo：：autoAimDemo（cv：：Mat &image） {
+如果 （image.empty（）） 返回;
+
+简历：：Mat HSV，面具;
+   
+cv：：cvtColor（image， hsv， cv：：COLOR_BGR2HSV）;
+
+ 
+cv：：inRange（hsv， cv：：Scalar（0， 120， 70）， cv：：Scalar（10， 255， 255）， mask）;
+cv：：inRange（hsv， cv：：Scalar（170， 120， 70）， cv：：Scalar（180， 255， 255）， mask）;红色在HSV里跨越了0和180两头
+
+   
+cv：：Mat kernel = cv：：getStructuringElement（cv：：MORPH_RECT， cv：：Size（3， 3））;
+cv：：morphologyEx（mask， mask， cv：：MORPH_OPEN， kernel）;
+
+std：：vector<std：：vector<cv：:P oint>>轮廓;
+cv：：findContours（mask， contours， cv：：RETR_EXTERNAL， cv：：CHAIN_APPROX_SIMPLE）;
+
+int valid_count = 0;
+对于 （size_t i = 0; i < contours.size（）; i++） {
+  
+cv：：Rect rect = cv：：boundingRect（contours[i]）;
+float aspect_ratio = （float）rect.width / （float）rect.height;
+double area = cv：：contourArea（contours[i]）;
+
+
+如果 （aspect_ratio > 0.1 & & aspect_ratio < 0.7 & 面积 > 30） {
+    
+cv：：rectangle（image， rect， cv：：Scalar（0， 255， 0）， 2）;
+valid_count++;
+        }
+    }
+
+std：：cout << “成功找到 ” << valid_count << “ 个疑似灯条！” << std：：endl;
+
+cv：：imshow（“Mask （二值化掩膜）”，mask）;
+cv：：imshow（“结果（自瞄灯条检测）”，图片）;
+cv：：waitKey（0）;
+
+cv：：imwrite（“armor_result.jpg”，图片）;
+}
