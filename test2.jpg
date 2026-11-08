@@ -1,0 +1,139 @@
+h.pp
+#pragma once
+#include<iostream>
+
+#include<opencv2/opencv.hpp>
+
+using namespace cv;
+using namespace std;
+struct LightBar {
+    RotatedRect rect;
+    Point2f     center;
+    float       ratio;
+};
+
+struct ArmorPair {
+    LightBar left;      
+    LightBar right;    
+    Rect     box;       
+};
+
+class MyDemo{
+   public:
+    
+          void aimdemo(Mat &image, const string &tag);
+};
+
+main.cpp
+#include <opencv2/opencv.hpp>
+#include <iostream>
+#include <string>
+#include"m.hpp"
+#include <cstdio>
+#include <vector>
+
+using namespace cv;
+using namespace std;
+
+#ifndef SRC_DIR
+#define SRC_DIR "."
+#endif
+
+int main(int argc, char** argv) {
+    string name = (argc > 1) ? argv[1] : "test1.jpg";
+    string tag  = name.substr(0, name.find_last_of('.'));
+
+    string path = string(SRC_DIR) + "/" + name;
+    Mat src = imread(path);
+    if (src.empty()) {
+        cout << "读不到图片: " << path << endl;
+        return -1;
+    }
+    cout << "读图成功: " << src.cols << " x " << src.rows
+         << "  (" << name << ")" << endl;
+
+    MyDemo demo;
+    demo.aimdemo(src, tag);
+
+    return 0;
+}
+
+
+m.cpp
+#include"m.hpp"
+#include<iostream>
+using namespace cv;
+
+void MyDemo::aimdemo(Mat &image, const string &tag) {
+    // 1. HSV 阈值分割（红色：H 跨 0 点，两段合并）
+    Mat hsv, m1, m2, mask;
+    cvtColor(image, hsv, COLOR_BGR2HSV);
+
+    inRange(hsv, Scalar(0,   80, 100), Scalar(25,  255, 255), m1);
+    inRange(hsv, Scalar(165, 80, 100), Scalar(180, 255, 255), m2);
+    mask = m1 | m2;
+
+    cout << "[aim] 二值图白色像素: " << countNonZero(mask) << endl;
+    imwrite(tag + "_aim_mask.png", mask);
+
+    vector<LightBar> bars = findLightBars(mask);
+
+    Mat canvas = image.clone();
+    drawCandidates(canvas, bars);          
+    imwrite(tag + "_aim_result.png", canvas);
+
+    cout << "[aim] 检出灯条 " << bars.size() << " 个" << endl;
+    cout << "[aim] 结果已保存: " << tag << "_aim_mask.png / " << tag << "_aim_result.png" << endl;
+
+    imshow("原图", image);
+    imshow("HSV 二值图", mask);
+    imshow("灯条标注", canvas);
+    waitKey(0);
+    destroyAllWindows();
+}
+
+
+vector<LightBar> MyDemo::findLightBars(Mat &bin) {
+    vector<vector<Point>> contours;
+    vector<LightBar> bars;
+
+    findContours(bin, contours, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE);
+    cout << "轮廓总数: " << contours.size() << endl;
+
+    for (auto &c : contours) {
+        double area = contourArea(c);
+        if (area < 400 || area > 1500) continue;
+
+        Rect bbox = boundingRect(c);
+        if (bbox.height <= bbox.width) continue;
+
+        RotatedRect rr = minAreaRect(c);
+        float w = rr.size.width, h = rr.size.height;
+        float longSide  = max(w, h);
+        float shortSide = min(w, h);
+        if (shortSide < 4) continue;
+
+        float ratio = longSide / shortSide;
+        if (ratio < 1.4 || ratio > 10) continue;
+
+        bars.push_back({rr, rr.center, ratio});
+        cout << "  ✔ 候选: 面积=" << area << " 宽=" << w
+             << " 高=" << h << " 长宽比=" << ratio << endl;
+    }
+
+    cout << "灯条候选数: " << bars.size() << endl;
+    return bars;
+}
+
+void MyDemo::drawCandidates(Mat &canvas, vector<LightBar> &bars) {
+    for (auto &b : bars) {
+        Point2f pts[4];
+        b.rect.points(pts);
+        for (int i = 0; i < 4; i++)
+            line(canvas, pts[i], pts[(i + 1) % 4], Scalar(0, 255, 0), 2);
+    }
+}
+
+
+
+
