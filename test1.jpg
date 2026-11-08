@@ -1,0 +1,536 @@
+main.cpp
+#include <opencv2/opencv.hpp>
+#include <iostream>
+#include <string>
+#include"m.hpp"
+#include <cstdio>
+#include <vector>
+
+#ifndef SRC_DIR
+#define SRC_DIR "."
+#endif
+
+int main(int argc,char** argv) {
+   // Mat src = imread("../test1.jpg");
+   string path = string(SRC_DIR) + "/test1.jpg";
+    Mat src = imread(path);
+    if(src.empty()){
+    //printf("could not load image...\n");
+     cout << "读不到图片: " << path << endl;
+return -1;
+    }
+     cout << "读图成功: " << src.cols << " x " << src.rows << endl;
+
+   // namedWindow("输入窗口",WINDOW_FREERATIO);
+    //imshow("输入窗口",src);
+
+    namedWindow("输入窗口", WINDOW_NORMAL);
+    imshow("输入窗口", src);
+
+    MyDemo demo;
+demo.inrangedemo(src);
+
+Mat bin = imread("01_mask.png", IMREAD_GRAYSCALE);
+    if (bin.empty()) {
+        cout << "读不到 01_mask.png" << endl;
+        return -1;
+}
+vector<LightBar> bars = demo.findLightBars(bin);
+vector<ArmorPair> pairs = demo.pairLightBars(bars);
+
+    Mat vis = src.clone();
+    demo.drawCandidates(vis, bars);
+     //demo.drawPairs(vis, pairs);  
+    imwrite("03_candidates.png", vis);
+
+    for (size_t k = 0; k < pairs.size(); k++) {
+        Rect box = pairs[k].box;
+        box.x = max(0, box.x);
+        box.y = max(0, box.y);
+        box.width  = min(box.width,  src.cols - box.x);
+        box.height = min(box.height, src.rows - box.y);
+
+        Mat roi = src(box).clone();
+        if (roi.empty()) continue;
+
+        Mat roiBig;
+        resize(roi, roiBig, Size(), 3.0, 3.0, INTER_NEAREST);
+
+        string name = "04_roi_" + to_string(k) + ".png";
+        imwrite(name, roiBig);
+        cout << "ROI 保存: " << name
+             << "  (" << roi.cols << "x" << roi.rows << ")" << endl;
+             imshow("装甲板 ROI", roiBig);   
+    }
+
+Mat final = src.clone();
+    demo.drawPairs(final, pairs);
+    imwrite("05_result.png", final);
+
+
+    imshow("原图", src);
+    imshow("二值图", bin);
+    imshow("灯条候选", vis);
+     imshow("最终结果", final);
+    waitKey(0);
+
+      destroyAllWindows();
+       cout << "\n全部完成，结果在 build/ 目录：" << endl;
+    cout << "  01_mask.png       二值图" << endl;
+    cout << "  03_candidates.png 灯条候选" << endl;
+    cout << "  04_roi_0.png      装甲板 ROI" << endl;
+    cout << "  05_result.png     最终结果" << endl;
+    return 0;
+
+}
+
+m.cpp
+
+#include"m.hpp"
+#include<iostream>
+using namespace cv;
+
+void MyDemo::inrangedemo(Mat &image) {
+    Mat hsv, m1, m2, mask, result;
+
+    cvtColor(image, hsv, COLOR_BGR2HSV);
+
+     inRange(hsv, Scalar(0,   80, 100), Scalar(25,  255, 255), m1);
+     inRange(hsv, Scalar(165, 80, 100), Scalar(180, 255, 255), m2);
+     mask = m1 | m2;
+        //inRange(hsv, Scalar(100, 110, 110), Scalar(130, 255, 255), mask);
+
+    bitwise_and(image, image, result, mask);
+
+    imwrite("01_mask.png", mask);
+    imwrite("02_color.png", result);
+
+    cout << "白色像素数: " << countNonZero(mask) << endl;
+}
+
+vector<LightBar> MyDemo::findLightBars(Mat &bin) {
+    vector<vector<Point>> contours;
+    vector<LightBar> bars;
+
+    findContours(bin, contours, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE);
+    cout << "轮廓总数: " << contours.size() << endl;
+    
+        for (auto &c : contours) {
+        double area = contourArea(c);
+        if (area < 400 || area > 1200) continue;
+        //if (area < 400 || area > 1500) continue;      // ① 面积（关键）
+
+        RotatedRect rr = minAreaRect(c);
+        float w = rr.size.width, h = rr.size.height;
+        float longSide  = max(w, h);
+        float shortSide = min(w, h);
+        if (shortSide < 2) continue;
+
+        float ratio = longSide / shortSide;            // ② 长宽比
+        if (ratio < 1.4 || ratio > 10) continue;
+
+        cout << "  ✔ 候选: 面积=" << area << " 宽=" << w << " 高=" << h
+             << " 长宽比=" << ratio << endl;
+        bars.push_back({rr, rr.center, ratio});
+    }
+
+    cout << "灯条候选数: " << bars.size() << endl;
+    return bars;
+}
+    void MyDemo::drawCandidates(Mat &canvas, vector<LightBar> &bars) {
+    for (auto &b : bars) {
+        Point2f pts[4];
+        b.rect.points(pts);
+        for (int i = 0; i < 4; i++)
+            line(canvas, pts[i], pts[(i + 1) % 4], Scalar(0, 255, 0), 2);
+    }
+}
+
+vector<ArmorPair> MyDemo::pairLightBars(vector<LightBar> &bars) {
+    struct Cand { float score; size_t i, j; };
+    vector<Cand> cands;
+
+    for (size_t i = 0; i < bars.size(); i++) {
+        for (size_t j = i + 1; j < bars.size(); j++) {
+            size_t a = i, b = j;
+            if (bars[a].center.x > bars[b].center.x) swap(a, b);
+
+            float wA = bars[a].rect.size.width,  hA = bars[a].rect.size.height;
+            float wB = bars[b].rect.size.width,  hB = bars[b].rect.size.height;
+
+            float lenA = max(wA, hA), lenB = max(wB, hB);   
+            float len  = (lenA + lenB) / 2;
+
+            float widA = min(wA, hA), widB = min(wB, hB);   
+            float wid  = max(widA, widB);
+
+            if (len < 4 || wid < 2) continue;
+
+            float dx = bars[b].center.x - bars[a].center.x;
+            float dy = fabs(bars[a].center.y - bars[b].center.y);
+
+            if (fabs(lenA - lenB) / len > 0.35f) continue;
+
+            if (fabs(widA - widB) / wid > 0.40f) continue;
+
+            if (dy > dx) continue;
+
+            if (dx < len * 1.0f || dx > len * 3.5f) continue;
+
+            float score = fabs(dx / len - 2.0f) + fabs(lenA - lenB) / len;
+            cands.push_back({score, a, b});
+        }
+    }
+
+    sort(cands.begin(), cands.end(),
+         [](const Cand &x, const Cand &y) { return x.score < y.score; });
+
+    vector<bool> used(bars.size(), false);
+    vector<ArmorPair> pairs;
+
+    for (auto &c : cands) {
+        if (used[c.i] || used[c.j]) continue;
+        used[c.i] = used[c.j] = true;
+
+        vector<Point2f> pts;
+        Point2f p[4];
+        bars[c.i].rect.points(p);
+        for (int k = 0; k < 4; k++) pts.push_back(p[k]);
+        bars[c.j].rect.points(p);
+        for (int k = 0; k < 4; k++) pts.push_back(p[k]);
+
+        ArmorPair ap;
+        ap.left  = bars[c.i];
+        ap.right = bars[c.j];
+        ap.box   = boundingRect(pts);
+        pairs.push_back(ap);
+
+        cout << "  ✔ 配对: score=" << c.score
+             << " 装甲板=" << ap.box.width << "x" << ap.box.height << endl;
+    }
+
+    cout << "配对成功: " << pairs.size() << " 对" << endl;
+    return pairs;
+}
+void MyDemo::drawPairs(Mat &canvas, vector<ArmorPair> &pairs) {
+    for (auto &p : pairs) {
+        rectangle(canvas, p.box, Scalar(0, 0, 255), 3);                       
+        line(canvas, p.left.center, p.right.center, Scalar(0, 255, 255), 1);  
+    }
+}
+
+void MyDemo::autoAimDemo(cv::Mat &image) {
+    if (image.empty()) return;
+
+    cv::Mat hsv, mask;
+
+    cv::cvtColor(image, hsv, cv::COLOR_BGR2HSV);
+
+    cv::inRange(hsv, cv::Scalar(0, 120, 70), cv::Scalar(10, 255, 255), mask);
+    cv::inRange(hsv, cv::Scalar(170, 120, 70), cv::Scalar(180, 255, 255), mask); // 红色在HSV里跨越了0和180两头
+
+
+    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3));
+    cv::morphologyEx(mask, mask, cv::MORPH_OPEN, kernel);
+
+    std::vector<std::vector<cv::Point>> contours;
+    cv::findContours(mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+
+    int valid_count = 0;
+    for (size_t i = 0; i < contours.size(); i++) {
+       
+        cv::Rect rect = cv::boundingRect(contours[i]);
+        float aspect_ratio = (float)rect.width / (float)rect.height; 
+        double area = cv::contourArea(contours[i]); 
+
+        if (aspect_ratio > 0.1 && aspect_ratio < 0.7 && area > 30) {
+            
+            cv::rectangle(image, rect, cv::Scalar(0, 255, 0), 2);
+            valid_count++;
+        }
+    }
+
+    std::cout << "成功找到 " << valid_count << " 个疑似灯条！" << std::endl;
+
+    cv::imshow("Mask (二值化掩膜)", mask);
+    cv::imshow("Result (自瞄灯条检测)", image);
+    cv::waitKey(0);
+
+    cv::imwrite("armor_result.jpg", image); 
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
